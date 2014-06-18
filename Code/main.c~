@@ -1,0 +1,112 @@
+#include "moveMotors.h"
+#include "ShaftEncoder.h"
+#include "PWM.h"
+#include "Motor.h"
+#include "Xbee.h"
+#include <stdlib.h>
+
+
+void port_init()
+{
+	motorsPinInit();
+
+	motion_pin_config();
+	buzzer_pin_config();
+
+	left_encoder_pin_config();
+	leftFront_encoder_pin_config();
+	right_encoder_pin_config();
+	rightFront_encoder_pin_config();
+
+	PWM_timerT5Init();
+	PWM_timerT3Init();
+
+	uart0_Xbee_init();
+}
+
+//----------------------
+//Function To Initialize all The Devices
+void init_devices()
+{
+ cli(); //Clears the global interrupts
+ port_init();  //Initializes all the ports
+ left_position_encoder_interrupt_init();
+ leftFront_position_encoder_interrupt_init();
+ right_position_encoder_interrupt_init();
+ rightFront_position_encoder_interrupt_init();
+ sei();   //Enables the global interrupts
+}
+
+
+#define NUM(ch) (ch-'0') 
+//unsigned char XbeeByte  ;
+
+#define AUTOMATE 2
+//#define AUTOMATE1 2
+#define COMMAND 1
+
+
+
+
+char fcall[5][5];
+int i =0, j = 0;
+int botId;
+
+// 10$f# 10$a$f$200$3#
+void function_caller()
+{
+	if(atoi(fcall[1]) == AUTOMATE ) //4 values 1st should be f 
+		moveMotors1(fcall[2][0],atoi(fcall[3]),atoi(fcall[4]));
+	else if(atoi(fcall[1]) == COMMAND )
+		moveMotors(fcall[2][0]);
+}
+
+
+int main(void)
+{
+	
+	init_devices();
+	botId =  10;
+	//unsigned char inp[5];
+	//int distance;
+	//input format - <1 character command><1stbitof spped><2nd bit><3rd Bit>
+	//ex. f100  or F100
+	unsigned char data ;
+while(1)
+{
+
+	data = uart0_getchar();
+	uart0_putchar(data);
+
+	
+	//uart0_putchar(mode);
+
+	if(data == 0x23) // #
+	{
+		if(atoi(fcall[0]) == botId) {
+			if(j != 0) {
+				fcall[i][j] = 0;
+				sei();
+				function_caller();
+				cli();
+			}
+			UDR0 = data;
+		}
+		i = 0;
+		j = 0;
+	}
+	else if(data == 0x24) // $
+	{
+		fcall[i][j] = 0;
+		i++;
+		j = 0;
+	}
+	else
+	{	
+		fcall[i][j] = data;
+		j++;
+	}
+}
+
+
+}
